@@ -125,7 +125,7 @@ async def run_load_test(
     start = time.monotonic()
     stop_at = start + ramp_up + duration  # se sostiene 'duration' tras terminar el ramp-up
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(limits=httpx.Limits(max_connections=None, max_keepalive_connections=None)) as client:
         tasks = []
         delay_between_users = ramp_up / users if users > 0 else 0
         for i in range(users):

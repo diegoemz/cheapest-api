@@ -1,0 +1,14 @@
+Lanzando prueba POST -> http://Cheapest-alb-792951536.us-east-1.elb.amazonaws.com/logistics/pedidos
+users=3000 ramp_up=100.0s duration=60.0s
+
+===== Resumen POST =====
+Total requests: 11277
+Duración total: 236.8 s
+Throughput: 47.63 req/s
+Latencia promedio: 10141.31 ms
+Latencia p95: 33124.85 ms
+Latencia p99: 53331.50 ms
+Error %: 0.03%
+=============================
+
+Resultados exportados a results_post.csv

@@ -1,0 +1,14 @@
+Lanzando prueba GET -> http://Cheapest-alb-792951536.us-east-1.elb.amazonaws.com/logistics/tenderos/productos-disponibles?tiendaId=bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb&zona=Zona Norte
+users=3000 ramp_up=100.0s duration=60.0s
+
+===== Resumen GET =====
+Total requests: 11836
+Duración total: 237.3 s
+Throughput: 49.87 req/s
+Latencia promedio: 10331.97 ms
+Latencia p95: 34172.37 ms
+Latencia p99: 54959.41 ms
+Error %: 0.00%
+=============================
+
+Resultados exportados a results_get.csv
