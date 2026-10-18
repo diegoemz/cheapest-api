@@ -1,0 +1,34 @@
+{
+  "POST venta (pending_stock_confirmation)" : {
+    "transaction" : "POST venta (pending_stock_confirmation)",
+    "sampleCount" : 200,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 4957.605000000004,
+    "medianResTime" : 4814.0,
+    "minResTime" : 4748.0,
+    "maxResTime" : 7316.0,
+    "pct1ResTime" : 5348.0,
+    "pct2ResTime" : 5816.3,
+    "pct3ResTime" : 6426.530000000001,
+    "throughput" : 7.800920508620017,
+    "receivedKBytesPerSec" : 7.892337545830407,
+    "sentKBytesPerSec" : 4.4032539589671575
+  },
+  "Total" : {
+    "transaction" : "Total",
+    "sampleCount" : 200,
+    "errorCount" : 0,
+    "errorPct" : 0.0,
+    "meanResTime" : 4957.605000000004,
+    "medianResTime" : 4814.0,
+    "minResTime" : 4748.0,
+    "maxResTime" : 7316.0,
+    "pct1ResTime" : 5348.0,
+    "pct2ResTime" : 5816.3,
+    "pct3ResTime" : 6426.530000000001,
+    "throughput" : 7.800920508620017,
+    "receivedKBytesPerSec" : 7.892337545830407,
+    "sentKBytesPerSec" : 4.4032539589671575
+  }
+}

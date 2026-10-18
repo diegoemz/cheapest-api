@@ -1,0 +1,18 @@
+{
+  "ronda": "3",
+  "T0_local": "15:09:06",
+  "T0_utc": "2026-10-18T20:09:06.391Z",
+  "recuperacion_local": "15:19:06",
+  "td_inventario": "td-Cheapest-inventario:2",
+  "td_ventas": "td-Cheapest-ventas:1",
+  "llamadasDisponibilidad": 271,
+  "sonda_201": 202,
+  "sonda_pending": 153,
+  "cloudwatch_RequestCount_inventario": 1881,
+  "logs_insights_por_flag": {
+    "504 UT": 222,
+    "400 -": 1584,
+    "503 UH": 3688,
+    "200 -": 46
+  }
+}

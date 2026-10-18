@@ -1,0 +1,68 @@
+=== Ronda 5 local — 2026-10-18 16:33:13 — rama lab5
+Base local 'cheapest' | cantidad inicial del ítem 11111111-1111-4111-8111-111111111111: 100
+Venta de verificación: HTTP 201 | pending=False
+
+========== FASE 1 — ESCENARIO 1: descuento aplicado dos veces (sin idempotencia)
+Cantidad antes: 99
+POST /inventory/ventas (intento 1, mismo ventaId): HTTP 201
+POST /inventory/ventas (intento 2, mismo ventaId): HTTP 201
+Cantidad después: 97  -> bajó 2 (una sola venta)
+
+========== FASE 1 — ESCENARIO 2: ventas registradas sin descuento de stock
+Cantidad antes: 97 | ventas antes: 1
+$ docker compose stop inventario
+Venta 1: HTTP 201 en 2.13 s | status=pending_stock_confirmation
+Venta 2: HTTP 201 en 0.03 s | status=pending_stock_confirmation
+Venta 3: HTTP 201 en 0.03 s | status=pending_stock_confirmation
+Con Inventario apagado: ventas 1 -> 4 (+3) | cantidad 97 -> 97
+$ sql "SELECT id, status, attempts, "createdAt" FROM outbox_http_calls ORDER BY "createdAt" DESC LIMIT 5;"
+                  id                  |  status   | attempts |         createdAt          
+--------------------------------------+-----------+----------+----------------------------
+ 4e0700c2-c3fa-4771-999d-ca8583c02ef1 | PENDING   |        0 | 2026-10-18 21:34:02.075454
+ c2c85dec-4834-4c82-a9af-4b8080493ca1 | PENDING   |        0 | 2026-10-18 21:34:02.045319
+ 5ae6b6cd-57e0-42ea-beda-d0ebc23bb539 | PENDING   |        0 | 2026-10-18 21:34:02.009877
+ 303b163b-06d1-4404-90a1-81e4ed5f096a | DELIVERED |        0 | 2026-10-18 21:33:48.219536
+(4 rows)
+(6 s después: attempts debe haber crecido)
+$ sql "SELECT id, status, attempts, "createdAt" FROM outbox_http_calls ORDER BY "createdAt" DESC LIMIT 5;"
+                  id                  |  status   | attempts |         createdAt          
+--------------------------------------+-----------+----------+----------------------------
+ 4e0700c2-c3fa-4771-999d-ca8583c02ef1 | PENDING   |        3 | 2026-10-18 21:34:02.075454
+ c2c85dec-4834-4c82-a9af-4b8080493ca1 | PENDING   |        3 | 2026-10-18 21:34:02.045319
+ 5ae6b6cd-57e0-42ea-beda-d0ebc23bb539 | PENDING   |        3 | 2026-10-18 21:34:02.009877
+ 303b163b-06d1-4404-90a1-81e4ed5f096a | DELIVERED |        0 | 2026-10-18 21:33:48.219536
+(4 rows)
+
+========== FASE 2 — Outbox e idempotencia
+$ docker compose start inventario
+T_rec (Inventario vuelve a responder /health): 16:35:13.626
+$ sql "SELECT id, status, attempts, "deliveredAt" FROM outbox_http_calls ORDER BY "createdAt" DESC LIMIT 5;"
+                  id                  |  status   | attempts |       deliveredAt       
+--------------------------------------+-----------+----------+-------------------------
+ 4e0700c2-c3fa-4771-999d-ca8583c02ef1 | DELIVERED |       37 | 2026-10-18 21:35:17.037
+ c2c85dec-4834-4c82-a9af-4b8080493ca1 | DELIVERED |       37 | 2026-10-18 21:35:17.028
+ 5ae6b6cd-57e0-42ea-beda-d0ebc23bb539 | DELIVERED |       37 | 2026-10-18 21:35:17.021
+ 303b163b-06d1-4404-90a1-81e4ed5f096a | DELIVERED |        0 | 2026-10-18 21:33:48.944
+(4 rows)
+Reconciliación: último deliveredAt − T_rec = 3.4 s (umbral ASR-4: < 30 s)
+Cantidad: 97 -> 94  (debe bajar exactamente 3: bajó 3)
+
+--- Reenvío de una entrega ya hecha con la misma X-Idempotency-Key
+Fila: id=4e0700c2-c3fa-4771-999d-ca8583c02ef1
+payload={"ventaId": "b73eda15-76d2-49af-91bb-73b7859287d8", "cantidad": 1, "tiendaId": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb", "fechaVenta": "2026-10-14T10:00:00.000Z", "productoId": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"}
+$ curl -i -X POST http://localhost:3002/inventory/ventas/desde-outbox -H 'X-Idempotency-Key: 4e0700c2-c3fa-4771-999d-ca8583c02ef1' -d '<payload>'
+HTTP/1.1 409 Conflict
+X-Powered-By: Express
+Access-Control-Allow-Origin: *
+Content-Type: application/json; charset=utf-8
+Content-Length: 112
+ETag: W/"70-8OqRdGyhEGSRFAH6uNbowUouVV4"
+Date: Sun, 18 Oct 2026 21:35:17 GMT
+Connection: keep-alive
+Keep-Alive: timeout=5
+
+{"message":"La clave 4e0700c2-c3fa-4771-999d-ca8583c02ef1 ya fue procesada","error":"Conflict","statusCode":409}
+Cantidad antes/después del reenvío: 94 -> 94 (no debe cambiar)
+
+>>> CAPTURAS: la tabla DELIVERED, la respuesta 409 y las cantidades están arriba y en registro.txt.
+Al terminar las capturas apague el ambiente local con:  docker compose down
