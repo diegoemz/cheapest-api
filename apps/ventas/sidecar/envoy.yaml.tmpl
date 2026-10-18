@@ -25,22 +25,30 @@ static_resources:
                             prefix: "/"
                           route:
                             cluster: inventario_cluster
-                            # TODO [1]: Calcule el timeout total de la ruta.
-                            # Debe cubrir: (connect_timeout + upstream response) × (1 intento original + num_retries) + backoff acumulado.
-                            # Un timeout demasiado corto aborta los reintentos; uno demasiado largo acumula conexiones en espera.
-                            timeout: ???s
+                            # [1] timeout = 4.5s
+                            # Mínimo: connect_timeout × (1 + num_retries) + backoff máximo
+                            #       = 2s × (1 + 1) + 0.125s (0.1s + 25 % de jitter) = 4.125s → 4.5s deja 0.375s de margen.
+                            # No se sube más: cada petición que llega antes de que abra el circuito espera este tiempo
+                            # completo y eso empuja el p99 del ASR-1 (< 3 s).
+                            # Es menor que INVENTARIO_TIMEOUT_MS (9000 ms), así Ventas no aborta antes que el sidecar.
+                            timeout: 4.5s
                             retry_policy:
                               retry_on: "5xx,reset,connect-failure,gateway-error"
-                              # TODO [2]: ¿Cuántos reintentos son suficientes para cubrir fallos transitorios
-                              # sin amplificar la carga más allá de 2× (ASR-2)?
-                              num_retries: ???
+                              # [2] num_retries = 1
+                              # A lo sumo 1 llamada original + 1 reintento = 2 llamadas a Inventario por venta.
+                              # Factor de amplificación ≤ 2, el máximo que permite el ASR-2.
+                              num_retries: 1
                               retry_back_off:
-                                # TODO [3]: Defina el intervalo base del backoff exponencial (en segundos, p. ej. 0.1s).
-                                # Recuerde que Envoy aplica ±25 % de jitter automáticamente sobre este valor.
-                                base_interval: ???s
-                                # TODO [4]: Defina el intervalo máximo del backoff (en segundos).
-                                # Evite valores tan altos que el timeout de la ruta expire antes del último reintento.
-                                max_interval: ???s
+                                # [3] base_interval = 0.1s
+                                # Con el jitter de ±25 % de Envoy la espera queda entre 75 y 125 ms: dispersa los
+                                # reintentos de muchas ventas simultáneas (evita reintentos sincronizados) sin sumar
+                                # latencia perceptible.
+                                base_interval: 0.1s
+                                # [4] max_interval = 1s
+                                # Tope del backoff exponencial. Con num_retries = 1 solo hay una espera (≤ 0.125s) y el
+                                # tope no se alcanza, pero garantiza que si se suben los reintentos el backoff siga
+                                # cabiendo dentro del timeout de la ruta.
+                                max_interval: 1s
                               retry_host_predicate:
                                 - name: envoy.retry_host_predicates.previous_hosts
                                   typed_config:
@@ -87,15 +95,18 @@ static_resources:
       # Outlier detection = implementación del patrón Circuit Breaker en Envoy.
       # Estados: CLOSED (normal) → OPEN (host eyectado) → HALF-OPEN (prueba automática).
       outlier_detection:
-        # TODO [5]: ¿Cuántos errores 5xx consecutivos deben ocurrir para abrir el circuito?
-        # Valor bajo → más sensible (abre rápido, más falsos positivos).
-        # Valor alto → más tolerante (tarda más en proteger al servicio).
-        consecutive_5xx: ???
+        # [5] consecutive_5xx = 3
+        # Ante el fallo persistente (retraso de 5 s) todas las peticiones fallan, así que el circuito abre en
+        # ~3 × 4.5s ≈ 13 s. Con 1 o 2 abriría por un error transitorio aislado (falsos positivos); con 5 o más
+        # tardaría más en abrir y más peticiones lentas dañarían el p99 del ASR-1.
+        consecutive_5xx: 3
         interval: 10s
-        # TODO [6]: ¿Cuánto tiempo debe permanecer el circuito OPEN antes de intentar HALF-OPEN?
-        # Debe ser inferior a la duración del fallo inyectado en Inventario (durationMs del
-        # endpoint de caos) para que el estado HALF-OPEN pueda detectar la recuperación.
-        base_ejection_time: ???s
+        # [6] base_ejection_time = 30s
+        # Es menor que RECOVERY_TIME_MS (600 s), como exige el lab. Envoy multiplica este tiempo por el número
+        # de eyecciones (30 s, 60 s, 90 s…), así que durante los 10 min de fallo el circuito prueba HALF-OPEN
+        # unas 6 veces y el intento cercano a los ~630 s detecta la recuperación antes de T0 + 12 min.
+        # Un valor menor (10 s) reabriría ~11 veces, dejando pasar ráfagas de peticiones lentas a Inventario.
+        base_ejection_time: 30s
         max_ejection_percent: 100
         enforcing_consecutive_5xx: 100
         enforcing_success_rate: 0
